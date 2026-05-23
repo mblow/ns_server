@@ -1519,10 +1519,18 @@ serve_ui_env(Req) ->
                              {lists:ukeymerge(1, NodeSpecificUIEnv,
                                               lists:ukeymerge(1, GlobalUIEnv, UIEnvDefault))}).
 
+%% MB-71811: Serve index.html with no-cache to prevent stale cached copies
+%% from being used after switching between products (e.g. EA and Couchbase
+%% Server on the same host:port.
 handle_serve_file(AppRoot, Path, MaxAge, Req) ->
-    menelaus_util:serve_file(
-        Req, Path, AppRoot,
-        [{"Cache-Control", lists:concat(["max-age=", MaxAge])}]).
+    CacheControl = case filename:basename(Path) of
+                       "index.html" ->
+                           [{"Cache-Control", "no-cache"}];
+                       _ ->
+                           [{"Cache-Control",
+                             lists:concat(["max-age=", MaxAge])}]
+                   end,
+    menelaus_util:serve_file(Req, Path, AppRoot, CacheControl).
 
 loop_inner(Req, Info, Path, PathTokens) ->
     perform_action(Req, get_action(Req, Info, Path, PathTokens)).
